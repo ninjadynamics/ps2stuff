@@ -4,6 +4,8 @@
 	  General Public License Version 2.1. See the file "COPYING" in the
 	  main directory of this archive for more details.                             */
 
+#include <stdio.h>
+
 #include "ps2s/gs.h"
 #include "ps2s/packet.h"
 
@@ -26,6 +28,12 @@ static tFlushPkt FlushPkt;
 
 void Init(void)
 {
+    // Canary: proves the locally-built ps2stuff fork is linked (not the
+    // toolchain prebuilt). Stamped with the build timestamp by the Makefile's
+    // `ps2stuff` target, mirroring the raylib/ps2gl LOCAL banners. GS::Init()
+    // runs once at startup (CGLContext ctor), so this prints exactly once.
+    printf("[ CANARY ] Initializing MODIFIED LOCAL ps2stuff [2026.06.04 10:24]\n");
+
     FlushPkt.gt.NLOOP = 1;
     FlushPkt.gt.EOP   = 1;
     FlushPkt.gt.PRE   = 0;
