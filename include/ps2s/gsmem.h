@@ -117,6 +117,10 @@ public:
     void RemoveAllSlots();
 
     void PrintSlots();
+
+    // Accumulate this list's slot stats (all page counts) for GetMemInfo:
+    // total pages, pages in use (bound or locked), and the largest free slot.
+    void AccumMemInfo(int& total, int& used, int& largestFree);
 };
 
 // needs to be after the definition of CMemSlotList
@@ -177,6 +181,11 @@ public:
     void SetCurFrame(int frame) { CurFrame = frame + 1; }
 
     void PrintAllocation();
+
+    // Live GS memory query (mirrors PrintAllocation's walk, accumulating instead
+    // of printing). All page counts: total carved into slots, used (bound or
+    // locked), and largest single free slot (a texture must fit in one slot).
+    void GetMemInfo(int& total, int& used, int& largestFreeSlot);
 };
 
 /********************************************

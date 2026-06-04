@@ -106,6 +106,19 @@ void CMemSlotList::PrintSlots()
         printf("\n");
 }
 
+void CMemSlotList::AccumMemInfo(int& total, int& used, int& largestFree)
+{
+    tSlotIter curSlot = Slots.begin();
+    for (; curSlot != Slots.end(); curSlot++) {
+        int len = (*curSlot)->GetPageLength();
+        total += len;
+        if ((*curSlot)->IsBound() || (*curSlot)->IsLocked())
+            used += len;
+        else if (len > largestFree)
+            largestFree = len;
+    }
+}
+
 void CMemSlotList::RemoveSlot(CMemSlot* slot)
 {
     tSlotIter curSlot = Slots.begin();
@@ -416,6 +429,19 @@ void CMemManager::PrintAllocation()
     tSlotListIter curList = SlotLists.begin();
     for (; curList != SlotLists.end(); curList++)
         (*curList)->PrintSlots();
+}
+
+void CMemManager::GetMemInfo(int& total, int& used, int& largestFreeSlot)
+{
+    total = used = largestFreeSlot = 0;
+
+    // Locked slots (framebuffers, z-buffer, locked textures): all in use.
+    LockedSlots.AccumMemInfo(total, used, largestFreeSlot);
+
+    // Unlocked pools: each slot is either bound (in use) or free.
+    tSlotListIter curList = SlotLists.begin();
+    for (; curList != SlotLists.end(); curList++)
+        (*curList)->AccumMemInfo(total, used, largestFreeSlot);
 }
 
 /********************************************
