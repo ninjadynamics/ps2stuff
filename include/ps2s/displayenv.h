@@ -126,6 +126,16 @@ public:
 
     void SendSettings(void);
 
+    // Push ONLY the active read circuit's DISPLAY2 register (raster position/
+    // size). Leaves PMODE / DISPFB / BGCOLOR untouched, so a live re-center
+    // (Screen Pos) doesn't reprogram the frame buffer or background mid-frame
+    // (which flashes the overscan border). Pair with SetDisplay2().
+    inline void SendDisplayPos(void)
+    {
+        using namespace GS::ControlRegs;
+        *(uint64_t*)display2 = *(uint64_t*)&gsrDisplay2;
+    }
+
     inline void* operator new(size_t size) { return Core::New16(size); }
     inline void operator delete(void* p) { Core::Delete16(p); }
 
