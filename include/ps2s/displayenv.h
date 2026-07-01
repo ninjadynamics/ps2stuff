@@ -136,6 +136,15 @@ public:
         *(uint64_t*)display2 = *(uint64_t*)&gsrDisplay2;
     }
 
+    // Push ONLY read circuit 1's DISPLAY register. Used by the flicker filter so
+    // RC1 re-centers with RC2 during a live Screen Pos nudge (SendDisplayPos
+    // handles RC2). Leaves PMODE / DISPFB untouched -- no border flash.
+    inline void SendDisplayPos1(void)
+    {
+        using namespace GS::ControlRegs;
+        *(uint64_t*)display1 = *(uint64_t*)&gsrDisplay1;
+    }
+
     inline void* operator new(size_t size) { return Core::New16(size); }
     inline void operator delete(void* p) { Core::Delete16(p); }
 
