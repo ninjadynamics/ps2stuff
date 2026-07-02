@@ -89,4 +89,16 @@ void CDisplayEnv::SendSettings(void)
     *(uint64_t*)bgcolor  = *(uint64_t*)&gsrBGColor;
 }
 
+// Per-flip subset: ONLY the frame-buffer addresses. The full SendSettings ran
+// on every SwapBuffers, and its BGCOLOR write stomped the app's raster-margin
+// color once per frame — invisible at 60 fps (the app re-zeros right after),
+// but on long frames the stomped color scans out as visible margin bands that
+// scale with load. A buffer flip changes DISPFB only; push just that.
+void CDisplayEnv::SendFBFlip(void)
+{
+    using namespace GS::ControlRegs;
+    *(uint64_t*)dispfb1 = *(uint64_t*)&gsrDispFB1;
+    *(uint64_t*)dispfb2 = *(uint64_t*)&gsrDispFB2;
+}
+
 } // namespace GS

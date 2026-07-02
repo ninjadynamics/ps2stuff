@@ -109,6 +109,18 @@ public:
         SetWrapModeT(tMode);
     }
     inline void SetUseTexAlpha(bool useTexAlpha);
+    // GS TEXA expansion for 16-bit (5551) texels: A=0 texels read alpha ta0,
+    // A=1 texels read ta1 (0x80 = 1.0). The ctor default ta0=0x80 ("identity")
+    // makes 1-bit-TRANSPARENT texels read OPAQUE to the alpha test — punch-
+    // through textures must set ta0=0. aem=1 additionally forces RGB==0
+    // texels fully transparent regardless of A. TEXA rides this texture's
+    // settings packet, so the value is applied per bind.
+    inline void SetTexAlpha(uint8_t ta0, uint8_t ta1, bool aem = false)
+    {
+        gsrTexA.alpha_0      = ta0;
+        gsrTexA.alpha_1      = ta1;
+        gsrTexA.alpha_method = aem;
+    }
 
     // other
 

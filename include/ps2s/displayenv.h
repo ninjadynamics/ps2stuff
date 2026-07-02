@@ -126,6 +126,11 @@ public:
 
     void SendSettings(void);
 
+    // Per-flip subset: only DISPFB1/2 (a buffer swap changes nothing else).
+    // Avoids the full SendSettings' BGCOLOR write, which stomped the app's
+    // margin color every frame (visible bands whenever frames ran long).
+    void SendFBFlip(void);
+
     // Push ONLY the active read circuit's DISPLAY2 register (raster position/
     // size). Leaves PMODE / DISPFB / BGCOLOR untouched, so a live re-center
     // (Screen Pos) doesn't reprogram the frame buffer or background mid-frame
