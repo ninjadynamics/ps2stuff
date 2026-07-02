@@ -27,7 +27,7 @@ namespace GS {
  */
 
 CTexEnv::CTexEnv(GS::tContext context, uint32_t width, uint32_t height, GS::tPSM psm)
-    : uiNumSettingsGSRegs(5)
+    : uiNumSettingsGSRegs(7)
     , SettingsPacket((uint128_t*)&SettingsDmaTag, uiNumSettingsGSRegs + 2,
           DMAC::Channels::gif, Packet::kDontXferTags,
           Core::MemMappings::Normal, Packet::kFull)
@@ -39,7 +39,7 @@ CTexEnv::CTexEnv(GS::tContext context, uint32_t width, uint32_t height, GS::tPSM
 }
 
 CTexEnv::CTexEnv(GS::tContext context)
-    : uiNumSettingsGSRegs(5)
+    : uiNumSettingsGSRegs(7)
     ,
     // gee, it's too bad c++ doesn't have a way of chaining constructors....
     SettingsPacket((uint128_t*)&SettingsDmaTag, uiNumSettingsGSRegs + 2,
@@ -50,7 +50,7 @@ CTexEnv::CTexEnv(GS::tContext context)
 }
 
 CTexEnv::CTexEnv(const CTexEnv& rhs)
-    : uiNumSettingsGSRegs(5)
+    : uiNumSettingsGSRegs(7)
     ,
     // gee, it's too bad c++ doesn't have a way of chaining constructors....
     SettingsPacket((uint128_t*)&SettingsDmaTag, uiNumSettingsGSRegs + 2,
@@ -127,6 +127,11 @@ void CTexEnv::InitCommon(GS::tContext context)
     gsrTex1.l    = 0;
     gsrTex1.k    = 0;
 
+    // per-texture MIPTBP (HyperSolar): zero until SetMiptbp — harmless while
+    // TEX1.MXL is 0 (the GS never dereferences mip pointers at MXL=0)
+    gsrMiptbp1 = 0;
+    gsrMiptbp2 = 0;
+
     // make sure things are qword aligned (I don't trust the compiler...)
     mAssert(((uint32_t)&SettingsGifTag & 0xf) == 0);
 }
@@ -154,13 +159,17 @@ void CTexEnv::SetContext(GS::tContext context)
 {
     // set the context-dependent registers
     if (context == GS::kContext1) {
-        ClampAddr = GS::RegAddrs::clamp_1;
-        Tex0Addr  = GS::RegAddrs::tex0_1;
-        Tex1Addr  = GS::RegAddrs::tex1_1;
+        ClampAddr   = GS::RegAddrs::clamp_1;
+        Tex0Addr    = GS::RegAddrs::tex0_1;
+        Tex1Addr    = GS::RegAddrs::tex1_1;
+        Miptbp1Addr = GS::RegAddrs::miptbp1_1;
+        Miptbp2Addr = GS::RegAddrs::miptbp2_1;
     } else {
-        ClampAddr = GS::RegAddrs::clamp_2;
-        Tex0Addr  = GS::RegAddrs::tex0_2;
-        Tex1Addr  = GS::RegAddrs::tex1_2;
+        ClampAddr   = GS::RegAddrs::clamp_2;
+        Tex0Addr    = GS::RegAddrs::tex0_2;
+        Tex1Addr    = GS::RegAddrs::tex1_2;
+        Miptbp1Addr = GS::RegAddrs::miptbp1_2;
+        Miptbp2Addr = GS::RegAddrs::miptbp2_2;
     }
 }
 

@@ -121,6 +121,16 @@ public:
         gsrTexA.alpha_1      = ta1;
         gsrTexA.alpha_method = aem;
     }
+    // HyperSolar: per-texture MIPTBP1/2 (packed u64 register values — mip
+    // level 1..6 base pointers + buffer widths). Rides this texture's
+    // settings packet like TEXA, so it is re-sent on every bind and ANY
+    // number of mipmapped textures can coexist; textures with TEX1.MXL=0
+    // ignore the (zero) value.
+    inline void SetMiptbp(uint64_t miptbp1, uint64_t miptbp2)
+    {
+        gsrMiptbp1 = miptbp1;
+        gsrMiptbp2 = miptbp2;
+    }
 
     // other
 
@@ -138,7 +148,7 @@ public:
 protected:
     // gs packet to setup texture environment
     struct {
-        // DMA tag + GIF tag + 5 register settings
+        // DMA tag + GIF tag + 7 register settings
         tSourceChainTag SettingsDmaTag;
         tGifTag SettingsGifTag;
         GS::tTexflush gsrTexflush;
@@ -151,6 +161,10 @@ protected:
         uint64_t Tex0Addr;
         GS::tTexa gsrTexA;
         uint64_t TexAAddr;
+        uint64_t gsrMiptbp1;    // packed MIPTBP1 value (see SetMiptbp)
+        uint64_t Miptbp1Addr;
+        uint64_t gsrMiptbp2;    // packed MIPTBP2 value
+        uint64_t Miptbp2Addr;
     } __attribute__((packed,aligned(16)));
 
     uint32_t uiNumSettingsGSRegs;
