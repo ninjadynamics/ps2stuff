@@ -4,11 +4,23 @@
 	  General Public License Version 2.1. See the file "COPYING" in the
 	  main directory of this archive for more details.                             */
 
+#include <stdio.h>
 #include <string>
 
 #include "ps2s/debug.h"
 #include "ps2s/gsmem.h"
 #include "ps2s/math.h"
+
+/* HyperSolar: mErrorIf compiles out in release, so an unallocatable slot fell
+   through to slot->Bind() on a NULL slot — a TLB crash (BadVAddr 0xC) with no
+   message. Fail LOUD and leave the area unbound instead: torn texels beat a
+   dead EE, and the printf names the missing/exhausted k_tex_shared slot class. */
+#define GSMEM_ALLOC_FAIL_GUARD(psmname, pagelen)                                        \
+    if (maxPriority == -1) {                                                            \
+        printf("gsmem: NO GS slot for psm%s pagelen %d — add/extend a k_tex_shared "    \
+               "class\n", psmname, (int)(pagelen));                                     \
+        return;                                                                         \
+    }
 
 /********************************************
  * CMemSlot
@@ -255,6 +267,7 @@ void CMemManager::Alloc4(CMemArea& memArea)
                                                Math::Max(priority4hl,
                                                    priority32)));
     mErrorIf(maxPriority == -1, "Failed to allocate a GS mem slot.");
+    GSMEM_ALLOC_FAIL_GUARD("4", memArea.GetPageLength());
 
     CMemSlot* slot = NULL;
     if (maxPriority == priority4)
@@ -292,6 +305,7 @@ void CMemManager::Alloc8(CMemArea& memArea)
     int maxPriority = Math::Max(priority8, Math::Max(priority8h, priority32));
     mErrorIf(maxPriority == -1,
         "Failed to allocate a %d page GS mem slot.", memArea.GetPageLength());
+    GSMEM_ALLOC_FAIL_GUARD("8", memArea.GetPageLength());
 
     CMemSlot* slot = NULL;
     if (maxPriority == priority8)
@@ -321,6 +335,7 @@ void CMemManager::Alloc16(CMemArea& memArea)
 
     int maxPriority = Math::Max(priority16, priority32);
     mErrorIf(maxPriority == -1, "Failed to allocate a GS mem slot.");
+    GSMEM_ALLOC_FAIL_GUARD("16", memArea.GetPageLength());
 
     CMemSlot* slot = NULL;
     if (maxPriority == priority16)
@@ -348,6 +363,7 @@ void CMemManager::Alloc24(CMemArea& memArea)
 
     int maxPriority = Math::Max(priority24, priority32);
     mErrorIf(maxPriority == -1, "Failed to allocate a GS mem slot.");
+    GSMEM_ALLOC_FAIL_GUARD("24", memArea.GetPageLength());
 
     CMemSlot* slot = NULL;
     if (maxPriority == priority24)
@@ -363,6 +379,11 @@ void CMemManager::Alloc32(CMemArea& memArea)
     CMemSlot* slot32 = FindLRUSlot(GS::kPsm32, memArea.GetPageLength());
 
     mErrorIf(slot32 == NULL, "Failed to allocate a GS mem slot");
+    if (slot32 == NULL) {
+        printf("gsmem: NO GS slot for psm32 pagelen %d — add/extend a k_tex_shared class\n",
+               (int)memArea.GetPageLength());
+        return;
+    }
 
     slot32->Bind(memArea, CurFrame);
 }

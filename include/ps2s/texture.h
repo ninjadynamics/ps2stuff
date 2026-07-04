@@ -205,6 +205,14 @@ public:
     void SendClut(CSCDmaPacket& packet);
     void SendClut(CVifSCDmaPacket& packet);
 
+    // HyperSolar: transfer ownership of the image buffer (pImage) to this texture
+    // so ~CTexture free()s it. glTexImage2D's SetImage(imagePtr) stores the caller's
+    // pointer WITHOUT taking ownership (SCEI default), so a caller that allocates a
+    // fresh buffer and forgets it (raylib4ps2's rlLoadTexturePS2 -> pglutAllocDmaMem)
+    // leaks it. pImage is memalign'd (pglutAllocDmaMem), free()-compatible. Do NOT
+    // call for buffers the caller manages (the pal8/mip16 paths in playstation2.c).
+    void SetFreeImageOnExit(bool b) { bFreeMemOnExit = b; }
+
 protected:
     uint128_t *pImage, *pClut;
     uint32_t uiGsAddr;
