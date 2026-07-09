@@ -111,6 +111,12 @@ public:
     inline void SetAlphaTestFailAction(tAlphaTestFailAction action) { gsrTest.atest_fail_method = (uint64_t)action; }
     inline void SetAlphaRefVal(uint8_t refVal) { gsrTest.atest_reference = refVal; }
 
+    // HyperSolar: the live packed TEST register. A custom renderer that emits
+    // its own TEST inside a kick MUST start from this value — TEST also carries
+    // ZTE/ZTST (and the dest-alpha test), so writing only the alpha-test fields
+    // from scratch would silently disable depth testing.
+    inline uint64_t GetTestReg(void) const { return *(const uint64_t*)&gsrTest; }
+
     inline void EnableSelectiveAlphaBlend(void) { gsrPABE.enable = 1; }
     inline void DisableSelectiveAlphaBlend(void) { gsrPABE.enable = 0; }
 
