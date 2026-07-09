@@ -138,6 +138,16 @@ public:
     void SendSettings(CSCDmaPacket& packet);
     void SendSettings(CVifSCDmaPacket& packet);
 
+    // HyperSolar: expose the in-object settings block (giftag + 7 A+D regs:
+    // TEXFLUSH, CLAMP, TEX1, TEX0, TEXA, MIPTBP1, MIPTBP2 — 8 qwords) so a
+    // custom renderer can embed this texture's FULL sampling state inside a
+    // VU1-kicked packet. The double-kick city renderer copies it wholesale,
+    // so per-texture TEXA/MIPTBP overrides ride along verbatim.
+    const uint128_t* GetSettingsBlock(void) const
+    {
+        return reinterpret_cast<const uint128_t*>(&SettingsGifTag);
+    }
+
     // assignment
     CTexEnv(const CTexEnv& rhs);
     CTexEnv& operator=(const CTexEnv& rhs);
