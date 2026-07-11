@@ -117,6 +117,16 @@ public:
     // from scratch would silently disable depth testing.
     inline uint64_t GetTestReg(void) const { return *(const uint64_t*)&gsrTest; }
 
+    // HyperSolar: live packed copies for mirroring this context's draw
+    // environment onto the OTHER GS context (the x2 dual-context window pass
+    // programs FRAME_2/ZBUF_2/XYOFFSET_2/SCISSOR_2/FBA_2 from these). Same
+    // rule as GetTestReg: NEVER build these registers from scratch.
+    inline uint64_t GetFrameReg(void) const { return *(const uint64_t*)&gsrFrame; }
+    inline uint64_t GetZBufReg(void) const { return *(const uint64_t*)&gsrZBuf; }
+    inline uint64_t GetXYOffsetReg(void) const { return *(const uint64_t*)&gsrXYOffset; }
+    inline uint64_t GetScissorReg(void) const { return *(const uint64_t*)&gsrScissor; }
+    inline uint64_t GetFBAReg(void) const { return *(const uint64_t*)&gsrFBA; }
+
     inline void EnableSelectiveAlphaBlend(void) { gsrPABE.enable = 1; }
     inline void DisableSelectiveAlphaBlend(void) { gsrPABE.enable = 0; }
 
