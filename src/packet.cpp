@@ -59,7 +59,13 @@ void* CDmaPacket::AllocBuffer(int numQwords, unsigned int memMapping)
     // an alignment of 64 bytes is strictly only necessary for uncached or uncached accl mem mappings, but
     // it ain't a bad idea in general..
     uint32_t alignment = 64;
-    void* mem      = (void*)((uint32_t)memalign(alignment, numQwords * 16) | memMapping);
+    if (numQwords <= 0 || (unsigned int)numQwords > 0x7fffffffu / 16u)
+        return NULL;
+    void* allocation = memalign(alignment, (unsigned int)numQwords * 16u);
+    // A failed allocation must stay NULL, not become an uncached alias of zero.
+    if (!allocation)
+        return NULL;
+    void* mem = (void*)((uint32_t)allocation | memMapping);
     // I hate to do this, but I've wasted FAR too much time hunting down cache incoherency
     if (memMapping == Core::MemMappings::Uncached || memMapping == Core::MemMappings::UncachedAccl) {
         // PLIN

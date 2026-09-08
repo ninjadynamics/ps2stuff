@@ -99,7 +99,7 @@ class CDrawEnv {
 public:
     CDrawEnv(GS::tContext context);
     CDrawEnv(const CDrawEnv& rhs);
-    CDrawEnv(GS::tContext context, uint32_t fbW, uint32_t fbH, uint32_t fbWordAddr, uint32_t zbufWordAddr = NULL);
+    CDrawEnv(GS::tContext context, uint32_t fbW, uint32_t fbH, uint32_t fbWordAddr, uint32_t zbufWordAddr = 0);
 
     void operator=(const CDrawEnv& otherDE);
 

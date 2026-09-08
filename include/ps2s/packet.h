@@ -95,6 +95,10 @@ public:
     // returning the old..  be aware of where memory is being deallocated..
     void* SwapOutBuffer(void* newBuffer);
 
+    // For an externally supplied AllocBuffer allocation, transfer its lifetime
+    // to this packet only after construction succeeds.
+    void TakeBufferOwnership(void) { bDeallocateBuffer = true; }
+
     void HexDump(uint32_t numQwords = 0);
     virtual void Print(void);
 
