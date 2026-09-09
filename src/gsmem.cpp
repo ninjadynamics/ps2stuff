@@ -131,7 +131,7 @@ void CMemSlotList::AccumMemInfo(int& total, int& used, int& largestFree)
     }
 }
 
-void CMemSlotList::RemoveSlot(CMemSlot* slot)
+CMemSlotList::tSlotIter CMemSlotList::FindSlot(CMemSlot* slot)
 {
     tSlotIter curSlot = Slots.begin();
     for (; curSlot != Slots.end(); curSlot++)
@@ -139,21 +139,34 @@ void CMemSlotList::RemoveSlot(CMemSlot* slot)
             break;
         }
 
-    mErrorIf((*curSlot != slot), "This list does not contain the specified slot!");
+    mErrorIf(curSlot == Slots.end(), "This list does not contain the specified slot!");
+    return curSlot;
+}
 
-    Slots.erase(curSlot);
+void CMemSlotList::RemoveSlot(CMemSlot* slot)
+{
+    tSlotIter curSlot = FindSlot(slot);
+    if (curSlot != Slots.end())
+        Slots.erase(curSlot);
 }
 
 void CMemSlotList::MakeSlotLRU(CMemSlot* slot)
 {
-    RemoveSlot(slot);
-    Slots.push_back(slot);
+    if (!Slots.empty() && Slots.back() == slot)
+        return;
+    tSlotIter curSlot = FindSlot(slot);
+    if (curSlot != Slots.end())
+        Slots.splice(Slots.end(), Slots, curSlot);
 }
 
 void CMemSlotList::MakeSlotMRU(CMemSlot* slot)
 {
-    RemoveSlot(slot);
-    Slots.push_front(slot);
+    if (!Slots.empty() && Slots.front() == slot)
+        return;
+    tSlotIter curSlot = FindSlot(slot);
+    // Texture residency checks only reorder an existing node: no heap churn.
+    if (curSlot != Slots.end())
+        Slots.splice(Slots.begin(), Slots, curSlot);
 }
 
 void CMemSlotList::RemoveAllSlots()

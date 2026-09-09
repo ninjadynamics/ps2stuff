@@ -22,11 +22,27 @@
 #include "ps2s/core.h"
 #include "ps2s/utils.h"
 
+// A/B: avoid reading packet RAM to construct tags or patch whole fields.
+// Rebuild consumers too: these writers are inline in the public header.
+#ifndef PS2S_DIRECT_PACKET_TAGS
+#define PS2S_DIRECT_PACKET_TAGS 1
+#endif
+#if PS2S_DIRECT_PACKET_TAGS != 0 && PS2S_DIRECT_PACKET_TAGS != 1
+#error "PS2S_DIRECT_PACKET_TAGS must be 0 or 1"
+#endif
+
 /********************************************
  * constants
  */
 
 namespace Packet {
+
+#if PS2S_DIRECT_PACKET_TAGS
+// EE is little-endian. These aligned stores intentionally address the packed
+// DMA/VIF object representation; may_alias preserves that contract under TBAA.
+typedef uint64_t TagWord __attribute__((__may_alias__));
+typedef uint16_t TagHalfword __attribute__((__may_alias__));
+#endif
 
 // constructors' isFull = ?
 static const bool kFull           = true;
@@ -408,12 +424,24 @@ CSCDmaPacket::Add(const CDmaPacket& otherPkt)
 inline void
 CSCDmaPacket::SetDmaTag(tDmaTag* tag, uint32_t QWC, uint32_t PCE, uint32_t ID, uint32_t IRQ, const uint128_t* ADDR, uint32_t SPR)
 {
+#if PS2S_DIRECT_PACKET_TAGS
+    // EE User's Manual p59: initialize all lower 64 bits, including the unused
+    // bits 16..25. Do not touch opt1/opt2: TTE may carry VIF commands there.
+    const uint64_t word = (uint64_t)(QWC & 0xffffu)
+        | ((uint64_t)(PCE & 3u) << 26)
+        | ((uint64_t)(ID & 7u) << 28)
+        | ((uint64_t)(IRQ & 1u) << 31)
+        | ((uint64_t)((uint32_t)ADDR & 0x7fffffffu) << 32)
+        | ((uint64_t)(SPR & 1u) << 63);
+    *reinterpret_cast<Packet::TagWord*>(tag) = word;
+#else
     tag->QWC  = QWC;
     tag->PCE  = PCE;
     tag->ID   = ID;
     tag->IRQ  = IRQ;
     tag->ADDR = (uint64_t)((uint32_t)ADDR);
     tag->SPR  = SPR;
+#endif
 }
 
 inline CSCDmaPacket&
@@ -423,8 +451,16 @@ CSCDmaPacket::CloseTag(void)
     mErrorIf(((uint32_t)pNext & (16 - 1)) != 0, "Packet is not qword aligned");
     // set the qwc field of any open tags.. (- 1 is so that we don't count the qword
     // containing the *pOpenTag)
-    if (pOpenTag)
+    if (pOpenTag) {
+#if PS2S_DIRECT_PACKET_TAGS
+        // QWC is exactly the low halfword. Preserve the rest of the tag without
+        // the old 64-bit read/modify/write of uncached-accelerated packet RAM.
+        *reinterpret_cast<Packet::TagHalfword*>(pOpenTag)
+            = (uint16_t)(((uint32_t)pNext - (uint32_t)pOpenTag) / 16 - 1);
+#else
         pOpenTag->QWC = (((uint32_t)pNext - (uint32_t)pOpenTag) / 16 - 1);
+#endif
+    }
 
     pOpenTag = NULL;
     return *this;
@@ -717,7 +753,12 @@ CVifSCDmaPacket::CloseUnpack(uint32_t unpackNUM)
     // make sure we're u32 aligned and a vifcode is open and it's an unpack
     mAssert(((uint32_t)pNext & 0x3) == 0 && pOpenVifCode && ((pOpenVifCode->cmd & 0x60) == 0x60));
     mAssert(unpackNUM <= 256);
+#if PS2S_DIRECT_PACKET_TAGS
+    // NUM is byte 2; 256 is encoded as zero, as with the old 8-bit field.
+    reinterpret_cast<unsigned char*>(pOpenVifCode)[2] = (unsigned char)unpackNUM;
+#else
     pOpenVifCode->num = (unpackNUM == 256) ? 0 : unpackNUM;
+#endif
     pOpenVifCode      = NULL;
     return *this;
 }
@@ -743,7 +784,13 @@ inline CVifSCDmaPacket&
 CVifSCDmaPacket::CloseDirect(uint32_t numQuads)
 {
     mAssert(pOpenVifCode != NULL && (((uint32_t)pNext - ((uint32_t)pOpenVifCode + 4)) & 0xf) == 0);
+#if PS2S_DIRECT_PACKET_TAGS
+    // IMMEDIATE occupies the low halfword; CMD/IRQ and NUM stay untouched.
+    // A 65536-qword DIRECT still uses the hardware's zero encoding.
+    *reinterpret_cast<Packet::TagHalfword*>(pOpenVifCode) = (uint16_t)numQuads;
+#else
     pOpenVifCode->immediate = numQuads;
+#endif
     pOpenVifCode            = NULL;
     return *this;
 }

@@ -85,6 +85,7 @@ class CMemSlotList {
     int PageLength;
     GS::tPSM PixFormat;
     typedef std::list<CMemSlot*>::iterator tSlotIter;
+    tSlotIter FindSlot(CMemSlot* slot);
 
 public:
     CMemSlotList(int pageLength, GS::tPSM pixFormat)
@@ -112,7 +113,8 @@ public:
     GS::tPSM GetPixFormat() const { return PixFormat; }
     int GetPageLength() const { return PageLength; }
 
-    CMemSlot* GetLRUSlot() const { return Slots.back(); }
+    // A class remains registered while all its slots are in LockedSlots.
+    CMemSlot* GetLRUSlot() const { return Slots.empty() ? NULL : Slots.back(); }
 
     void RemoveAllSlots();
 
