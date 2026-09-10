@@ -32,7 +32,7 @@ void Init(void)
     // toolchain prebuilt). Stamped with the build timestamp by the Makefile's
     // `ps2stuff` target, mirroring the raylib/ps2gl LOCAL banners. GS::Init()
     // runs once at startup (CGLContext ctor), so this prints exactly once.
-    printf("[ CANARY ] Initializing MODIFIED LOCAL ps2stuff [2026.09.09 20:41]\n");
+    printf("[ CANARY ] Initializing MODIFIED LOCAL ps2stuff [2026.09.10 11:17]\n");
 
     FlushPkt.gt.NLOOP = 1;
     FlushPkt.gt.EOP   = 1;

@@ -110,6 +110,13 @@ public:
     inline void SetAlphaTestPassMode(tAlphaTestPassMode mode) { gsrTest.atest_method = (uint64_t)mode; }
     inline void SetAlphaTestFailAction(tAlphaTestFailAction action) { gsrTest.atest_fail_method = (uint64_t)action; }
     inline void SetAlphaRefVal(uint8_t refVal) { gsrTest.atest_reference = refVal; }
+    inline bool HasAlphaTestFunc(uint8_t refVal, tAlphaTestPassMode mode,
+        tAlphaTestFailAction action) const
+    {
+        return gsrTest.atest_reference == refVal &&
+            gsrTest.atest_method == (uint64_t)mode &&
+            gsrTest.atest_fail_method == (uint64_t)action;
+    }
 
     // HyperSolar: the live packed TEST register. A custom renderer that emits
     // its own TEST inside a kick MUST start from this value — TEST also carries
@@ -131,6 +138,12 @@ public:
     inline void DisableSelectiveAlphaBlend(void) { gsrPABE.enable = 0; }
 
     inline void SetAlphaBlendFunc(tAlphaBlendVal a, tAlphaBlendVal b, tAlphaBlendVal c, tAlphaBlendVal d, uint32_t fix);
+    inline bool HasAlphaBlendFunc(tAlphaBlendVal a, tAlphaBlendVal b,
+        tAlphaBlendVal c, tAlphaBlendVal d, uint32_t fix) const
+    {
+        return gsrAlpha.a == a && gsrAlpha.b == b && gsrAlpha.c == c &&
+            gsrAlpha.d == d && gsrAlpha.alpha == fix;
+    }
 
     inline void EnableColorClamp(void) { gsrColClamp.clamp = 1; }
     inline void DisableColorClamp(void) { gsrColClamp.clamp = 0; }
@@ -145,6 +158,12 @@ public:
         gsrTest.ztest_method = (uint64_t)passMode;
         eZTestPassMode       = passMode;
     }
+    inline bool HasDepthTestPassMode(tZTestPassMode passMode) const
+    {
+        // DisableDepthTest changes the register but retains the mode to restore.
+        // Equality must cover BOTH, not just the remembered OpenGL setting.
+        return eZTestPassMode == passMode && gsrTest.ztest_method == (uint64_t)passMode;
+    }
     inline void SetDepthBufferAddr(uint32_t wordAddress) { gsrZBuf.fb_addr = wordAddress / 2048; }
     inline void SetDepthBufferPSM(uint32_t psm) { gsrZBuf.psm = (uint64_t)psm; }
     inline void EnableDepthTest(void)
@@ -158,6 +177,7 @@ public:
         gsrTest.ztest_method = (uint64_t)ZTest::kAlways;
     }
     inline void SetDepthWriteEnabled(bool write) { gsrZBuf.update_mask = !write; }
+    inline bool GetDepthWriteEnabled() const { return gsrZBuf.update_mask == 0; }
 
     inline void SetFrameBufferAddr(uint32_t wordAddress)
     {
@@ -165,6 +185,7 @@ public:
         gsrFrame.fb_addr = wordAddress / 2048;
     }
     inline void SetFrameBufferDrawMask(uint32_t drawMask) { gsrFrame.draw_mask = drawMask; }
+    inline uint32_t GetFrameBufferDrawMask() const { return gsrFrame.draw_mask; }
     void SetFrameBufferDim(uint32_t pixelW, uint32_t pixelH);
     inline void SetFrameBufferPSM(uint32_t psm) { gsrFrame.psm = psm; }
     float GetInterlacedPixelOffset() const { return InterlacedOffset; }

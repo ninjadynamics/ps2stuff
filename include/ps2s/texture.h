@@ -76,7 +76,17 @@ public:
     // if you must use the short constructor, be sure to call SetDimensions() and SetPSM()!!
     CTexEnv(GS::tContext context = GS::kContext1);
     CTexEnv(GS::tContext context, uint32_t width, uint32_t height, GS::tPSM psm);
-    virtual ~CTexEnv(void) {}
+    virtual ~CTexEnv(void) { InvalidateTextureSync(); }
+
+    // Shared texture registers/cache/CLUT have writers outside a GL manager.
+    // Every actual settings/image/palette send advances this serial; raw GIF
+    // texture writers must call this too. Zero permanently disables reuse on
+    // overflow, so a stale snapshot can never become valid through wraparound.
+    static void InvalidateTextureSync()
+    {
+        if (TextureSyncSerial != 0) ++TextureSyncSerial;
+    }
+    static uint32_t GetTextureSyncSerial() { return TextureSyncSerial; }
 
     // accessors
 
@@ -183,6 +193,7 @@ protected:
     CSCDmaPacket SettingsPacket;
 
 private:
+    static uint32_t TextureSyncSerial;
     void InitCommon(GS::tContext context);
 
 };
@@ -260,7 +271,7 @@ class CClut {
 
 public:
     CClut(const void* table, int numEntries);
-    ~CClut() { delete UploadPkt; }
+    ~CClut() { CTexEnv::InvalidateTextureSync(); delete UploadPkt; }
 
     void SetGsAddr(unsigned int wordAddr)
     {
@@ -271,10 +282,11 @@ public:
 
     void Send(bool waitForEnd = false, bool flushCache = true)
     {
+        CTexEnv::InvalidateTextureSync();
         UploadPkt->Send(waitForEnd, flushCache);
     }
-    void Send(CSCDmaPacket& packet) { UploadPkt->Send(packet); }
-    void Send(CVifSCDmaPacket& packet) { UploadPkt->Send(packet); }
+    void Send(CSCDmaPacket& packet) { CTexEnv::InvalidateTextureSync(); UploadPkt->Send(packet); }
+    void Send(CVifSCDmaPacket& packet) { CTexEnv::InvalidateTextureSync(); UploadPkt->Send(packet); }
 };
 
 /********************************************

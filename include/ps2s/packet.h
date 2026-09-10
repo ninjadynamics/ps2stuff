@@ -106,6 +106,24 @@ public:
     uint8_t* GetNextPtr(void) const { return pNext; }
     uint32_t GetByteLength(void) const { return (uint32_t)pNext - (uint32_t)pBase; }
 
+    // Contiguous plain-packet payload reservation. Preflight every destination
+    // before reserving when one operation appends to several attribute buffers.
+    // The owner must initialize the span before publishing a DMA reference.
+    // Not a source-chain/TTE writer: use the derived class's Add for those.
+    bool CanReserveWords(uint32_t words) const
+    {
+        const size_t used = (size_t)(pNext - pBase);
+        const size_t capacity = (size_t)uiBufferQwordSize * 16;
+        return !(used & 3) && used <= capacity && words <= (capacity - used) / 4;
+    }
+    void* ReserveWords(uint32_t words)
+    {
+        mAssert(CanReserveWords(words));
+        void* result = pNext;
+        pNext += (size_t)words * 4;
+        return result;
+    }
+
     static void* AllocBuffer(int numQwords, unsigned int memMapping);
     // be VERY careful using this.. it swaps its internal dma buffer with the new,
     // returning the old..  be aware of where memory is being deallocated..

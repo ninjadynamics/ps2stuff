@@ -22,6 +22,8 @@
 
 namespace GS {
 
+uint32_t CTexEnv::TextureSyncSerial = 1;
+
 /********************************************
  * CTexEnv methods
  */
@@ -175,11 +177,13 @@ void CTexEnv::SetContext(GS::tContext context)
 
 void CTexEnv::SendSettings(bool waitForEnd, bool flushCache)
 {
+    InvalidateTextureSync();
     SettingsPacket.Send(waitForEnd, flushCache);
 }
 
 void CTexEnv::SendSettings(CSCDmaPacket& packet)
 {
+    InvalidateTextureSync();
     packet.Cnt();
     packet.Add((uint128_t*)&SettingsGifTag, uiNumSettingsGSRegs + 1);
     packet.CloseTag();
@@ -187,6 +191,7 @@ void CTexEnv::SendSettings(CSCDmaPacket& packet)
 
 void CTexEnv::SendSettings(CVifSCDmaPacket& packet)
 {
+    InvalidateTextureSync();
     packet.Cnt();
     {
         // the data needs to be qword-aligned, so pad with appropriate # of vifnops to
@@ -451,22 +456,26 @@ void CTexture::Reset()
 
 void CTexture::SendImage(bool waitForEnd, bool flushCache)
 {
+    InvalidateTextureSync();
     mAssert(pImage != NULL);
     pImageUploadPkt->Send(waitForEnd, flushCache);
 }
 
 void CTexture::SendImage(CSCDmaPacket& packet)
 {
+    InvalidateTextureSync();
     pImageUploadPkt->Send(packet);
 }
 
 void CTexture::SendImage(CVifSCDmaPacket& packet)
 {
+    InvalidateTextureSync();
     pImageUploadPkt->Send(packet);
 }
 
 void CTexture::SendClut(bool waitForEnd, bool flushCache)
 {
+    InvalidateTextureSync();
     mAssert(pClut != NULL);
 
     pClutUploadPkt->Send(waitForEnd, flushCache);
@@ -474,11 +483,13 @@ void CTexture::SendClut(bool waitForEnd, bool flushCache)
 
 void CTexture::SendClut(CSCDmaPacket& packet)
 {
+    InvalidateTextureSync();
     pClutUploadPkt->Send(packet);
 }
 
 void CTexture::SendClut(CVifSCDmaPacket& packet)
 {
+    InvalidateTextureSync();
     pClutUploadPkt->Send(packet);
 }
 
