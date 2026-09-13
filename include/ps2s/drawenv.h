@@ -223,6 +223,33 @@ public:
     void SendSettings(CSCDmaPacket& packet);
     void SendSettings(CVifSCDmaPacket& packet);
 
+    // A zero-alpha blend returns the stored destination RGB, but dithering
+    // that RGB5 value again can subtract another 5-bit step. Do not rewrite
+    // the framebuffer for those transparent texels. ZB_ONLY retains the
+    // original depth test/write behavior (including the existing ZMSK).
+    // This is an emitted TEST override: keep the application's logical alpha
+    // test intact, and leave its explicitly enabled tests authoritative.
+    inline void SendSettingsForBlend(CVifSCDmaPacket& packet, bool blendEnabled)
+    {
+        const bool rgb16 = gsrFrame.psm == GS::kPsm16 ||
+            gsrFrame.psm == GS::kPsm16s;
+        if (!blendEnabled || !rgb16 || !gsrDTHE.enable ||
+            gsrTest.atest_enable || gsrTest.datest_enable || gsrPABE.enable ||
+            gsrAlpha.c != ABlend::kSourceAlpha || gsrAlpha.d != ABlend::kDestRGB) {
+            SendSettings(packet);
+            return;
+        }
+        const GS::tTest savedTest = gsrTest;
+        EnableAlphaTest();
+        SetAlphaRefVal(0);
+        SetAlphaTestPassMode(ATest::kGreater);
+        SetAlphaTestFailAction(ATest::kZBuffOnly);
+        // SendSettings copies the register block into packet-owned storage.
+        // Restore only after that copy; queued packets retain their own TEST.
+        SendSettings(packet);
+        gsrTest = savedTest;
+    }
+
     // accessors
     uint32_t GetFrameBufferAddr(void) { return gsrFrame.fb_addr * 2048; }
 

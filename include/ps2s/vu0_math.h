@@ -1,4 +1,4 @@
-/* VU0 macro-mode math experiment. C/C++ compatible; no legacy VU classes.
+/* VU0 macro-mode math kernels. C/C++ compatible; no legacy VU classes.
  *
  * Main render thread owns VU0 during each complete asm block. Do not call from
  * an interrupt handler, another VU0-using thread, or while a VU0 microprogram
@@ -20,14 +20,8 @@
 #ifndef PS2S_VU0_MATH_H
 #define PS2S_VU0_MATH_H
 
-/* Interleave independent points inside the existing batch, preserving every
- * point's operand/order tree. 0 selects the preceding serial batch schedule. */
-#ifndef PS2S_VU0_BATCH_INTERLEAVE
-#define PS2S_VU0_BATCH_INTERLEAVE 1
-#endif
-#if PS2S_VU0_BATCH_INTERLEAVE != 0 && PS2S_VU0_BATCH_INTERLEAVE != 1
-#error "PS2S_VU0_BATCH_INTERLEAVE must be 0 or 1"
-#endif
+/* Batch kernels interleave independent points while preserving every
+ * point's operand/order tree. */
 
 typedef float ps2s_vu0_mat4[16] __attribute__((aligned(16)));
 typedef float ps2s_vu0_vec4[4] __attribute__((aligned(16)));
@@ -126,7 +120,6 @@ typedef float ps2s_vu0_vec4[4] __attribute__((aligned(16)));
             : : [out] "r"(OUT), [mat] "r"(MAT), [vec] "r"(VEC) : "memory"); \
     } while (0)
 
-#if PS2S_VU0_BATCH_INTERLEAVE
 /* Four independent points at a time separate dependent sums with useful work.
  * Same twelve input loads, 24 VMUL, 24 VADD and eight output stores as below.
  * VF1-12 retain all inputs before any store; VF13-24 are private scratch.
@@ -205,87 +198,6 @@ typedef float ps2s_vu0_vec4[4] __attribute__((aligned(16)));
             "sqc2 $vf22, 0x70(%[out])\n\t" \
             : : [out] "r"(OUT), [mat] "r"(MAT), [vec] "r"(VEC) : "memory"); \
     } while (0)
-#else
-/* Eight affine points share four matrix loads. MAT is 16 floats; VEC and OUT
- * are 32 floats (eight xyzw records). Input w is unused; all output lanes are
- * defined. All twelve input qwords load before the first store, including for
- * overlapping ranges. VF1-12 retain inputs; VF13-15 and MAC/status are scratch.
- */
-#define PS2S_VU0_MAT4_VEC3_BATCH8_ALIGNED(OUT, MAT, VEC) \
-    do { \
-        __asm__ __volatile__( \
-            "lqc2 $vf1, 0x00(%[mat])\n\t" \
-            "lqc2 $vf2, 0x10(%[mat])\n\t" \
-            "lqc2 $vf3, 0x20(%[mat])\n\t" \
-            "lqc2 $vf4, 0x30(%[mat])\n\t" \
-            "lqc2 $vf5, 0x00(%[vec])\n\t" \
-            "lqc2 $vf6, 0x10(%[vec])\n\t" \
-            "lqc2 $vf7, 0x20(%[vec])\n\t" \
-            "lqc2 $vf8, 0x30(%[vec])\n\t" \
-            "lqc2 $vf9, 0x40(%[vec])\n\t" \
-            "lqc2 $vf10, 0x50(%[vec])\n\t" \
-            "lqc2 $vf11, 0x60(%[vec])\n\t" \
-            "lqc2 $vf12, 0x70(%[vec])\n\t" \
-            "vmulx.xyzw $vf13, $vf1, $vf5\n\t" \
-            "vmuly.xyzw $vf14, $vf2, $vf5\n\t" \
-            "vmulz.xyzw $vf15, $vf3, $vf5\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf14\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf15\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf4\n\t" \
-            "sqc2 $vf13, 0x00(%[out])\n\t" \
-            "vmulx.xyzw $vf13, $vf1, $vf6\n\t" \
-            "vmuly.xyzw $vf14, $vf2, $vf6\n\t" \
-            "vmulz.xyzw $vf15, $vf3, $vf6\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf14\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf15\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf4\n\t" \
-            "sqc2 $vf13, 0x10(%[out])\n\t" \
-            "vmulx.xyzw $vf13, $vf1, $vf7\n\t" \
-            "vmuly.xyzw $vf14, $vf2, $vf7\n\t" \
-            "vmulz.xyzw $vf15, $vf3, $vf7\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf14\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf15\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf4\n\t" \
-            "sqc2 $vf13, 0x20(%[out])\n\t" \
-            "vmulx.xyzw $vf13, $vf1, $vf8\n\t" \
-            "vmuly.xyzw $vf14, $vf2, $vf8\n\t" \
-            "vmulz.xyzw $vf15, $vf3, $vf8\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf14\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf15\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf4\n\t" \
-            "sqc2 $vf13, 0x30(%[out])\n\t" \
-            "vmulx.xyzw $vf13, $vf1, $vf9\n\t" \
-            "vmuly.xyzw $vf14, $vf2, $vf9\n\t" \
-            "vmulz.xyzw $vf15, $vf3, $vf9\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf14\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf15\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf4\n\t" \
-            "sqc2 $vf13, 0x40(%[out])\n\t" \
-            "vmulx.xyzw $vf13, $vf1, $vf10\n\t" \
-            "vmuly.xyzw $vf14, $vf2, $vf10\n\t" \
-            "vmulz.xyzw $vf15, $vf3, $vf10\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf14\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf15\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf4\n\t" \
-            "sqc2 $vf13, 0x50(%[out])\n\t" \
-            "vmulx.xyzw $vf13, $vf1, $vf11\n\t" \
-            "vmuly.xyzw $vf14, $vf2, $vf11\n\t" \
-            "vmulz.xyzw $vf15, $vf3, $vf11\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf14\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf15\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf4\n\t" \
-            "sqc2 $vf13, 0x60(%[out])\n\t" \
-            "vmulx.xyzw $vf13, $vf1, $vf12\n\t" \
-            "vmuly.xyzw $vf14, $vf2, $vf12\n\t" \
-            "vmulz.xyzw $vf15, $vf3, $vf12\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf14\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf15\n\t" \
-            "vadd.xyzw $vf13, $vf13, $vf4\n\t" \
-            "sqc2 $vf13, 0x70(%[out])\n\t" \
-            : : [out] "r"(OUT), [mat] "r"(MAT), [vec] "r"(VEC) : "memory"); \
-    } while (0)
-
-#endif /* PS2S_VU0_BATCH_INTERLEAVE */
 
 /* Four independent dot3 points, component-major storage: VEC holds four X,
  * four Y, then four Z values; OUT has the same shape. MAT holds three padded
