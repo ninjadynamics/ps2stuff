@@ -85,8 +85,25 @@ public:
     static void InvalidateTextureSync()
     {
         if (TextureSyncSerial != 0) ++TextureSyncSerial;
+        InvalidateContext2Proof();
     }
     static uint32_t GetTextureSyncSerial() { return TextureSyncSerial; }
+
+    // Proof of preceding writes in ONE ordered VIF chain, not GS completion.
+    // Context 2 is persistent, but TEXA and the wall TEST_1 pin have other
+    // writers. Unknown/raw sends and replayed packets invalidate the proof;
+    // known context-1 sends may retain context 2 while recording their actual
+    // emitted global state. Serial zero stays disabled after wraparound.
+    static void InvalidateContext2Proof();
+    static uint32_t GetContext2WriteSerial();
+    static void NoteOrderedTextureSettings(const CVifSCDmaPacket& packet,
+        GS::tContext context, uint64_t texa);
+    static void NoteOrderedDrawSettings(const CVifSCDmaPacket& packet,
+        GS::tContext context, uint64_t test);
+    static void NoteOrderedContext2Prefix(const CVifSCDmaPacket& packet,
+        uint64_t texa, uint64_t test1);
+    static bool HasOrderedWindowGlobals(const CVifSCDmaPacket& packet,
+        uint64_t texa, uint64_t test1);
 
     // accessors
 

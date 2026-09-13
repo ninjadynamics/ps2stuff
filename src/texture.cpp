@@ -9,6 +9,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 
 #include "dma.h"
 #include "graph.h"
@@ -23,6 +24,90 @@
 namespace GS {
 
 uint32_t CTexEnv::TextureSyncSerial = 1;
+
+namespace {
+uint32_t context2WriteSerial = 1;
+const CVifSCDmaPacket* context2ProofPacket;
+const uint128_t* context2ProofBase;
+uint32_t context2ProofBytes;
+uint64_t context2ProofTexa, context2ProofTest1;
+bool context2ProofHasTexa, context2ProofHasTest1;
+
+void SelectContext2ProofPacket(const CVifSCDmaPacket& packet)
+{
+    if (context2ProofPacket != &packet || context2ProofBase != packet.GetBase() ||
+        context2ProofBytes > packet.GetByteLength()) {
+        // Building a different chain does not establish its execution order
+        // relative to the preceding one. Do not carry context-2 ownership
+        // back into an earlier packet after merely restoring TEXA / TEST_1.
+        if (context2ProofPacket && context2WriteSerial != 0) ++context2WriteSerial;
+        context2ProofHasTexa = false;
+        context2ProofHasTest1 = false;
+    }
+    context2ProofPacket = &packet;
+    context2ProofBase = packet.GetBase();
+    context2ProofBytes = packet.GetByteLength();
+}
+}
+
+void CTexEnv::InvalidateContext2Proof()
+{
+    if (context2WriteSerial != 0) ++context2WriteSerial;
+    context2ProofPacket = NULL;
+    context2ProofBase = NULL;
+    context2ProofBytes = 0;
+    context2ProofHasTexa = false;
+    context2ProofHasTest1 = false;
+}
+
+uint32_t CTexEnv::GetContext2WriteSerial()
+{
+    return context2WriteSerial;
+}
+
+void CTexEnv::NoteOrderedTextureSettings(const CVifSCDmaPacket& packet,
+    GS::tContext context, uint64_t texa)
+{
+    // Preserve the ordinary texture-manager serial's original send semantics.
+    if (TextureSyncSerial != 0) ++TextureSyncSerial;
+    if (context != GS::kContext1) InvalidateContext2Proof();
+    SelectContext2ProofPacket(packet);
+    context2ProofTexa = texa;
+    context2ProofHasTexa = true;
+}
+
+void CTexEnv::NoteOrderedDrawSettings(const CVifSCDmaPacket& packet,
+    GS::tContext context, uint64_t test)
+{
+    if (context != GS::kContext1) {
+        InvalidateContext2Proof();
+        return;
+    }
+    SelectContext2ProofPacket(packet);
+    context2ProofTest1 = test;
+    context2ProofHasTest1 = true;
+}
+
+void CTexEnv::NoteOrderedContext2Prefix(const CVifSCDmaPacket& packet,
+    uint64_t texa, uint64_t test1)
+{
+    // The raw writer invalidates before emitting its complete owned prefix.
+    SelectContext2ProofPacket(packet);
+    context2ProofTexa = texa;
+    context2ProofTest1 = test1;
+    context2ProofHasTexa = true;
+    context2ProofHasTest1 = true;
+}
+
+bool CTexEnv::HasOrderedWindowGlobals(const CVifSCDmaPacket& packet,
+    uint64_t texa, uint64_t test1)
+{
+    return context2WriteSerial != 0 && context2ProofPacket == &packet &&
+        context2ProofBase == packet.GetBase() &&
+        context2ProofBytes <= packet.GetByteLength() &&
+        context2ProofHasTexa && context2ProofHasTest1 &&
+        context2ProofTexa == texa && context2ProofTest1 == test1;
+}
 
 /********************************************
  * CTexEnv methods
@@ -191,7 +276,6 @@ void CTexEnv::SendSettings(CSCDmaPacket& packet)
 
 void CTexEnv::SendSettings(CVifSCDmaPacket& packet)
 {
-    InvalidateTextureSync();
     packet.Cnt();
     {
         // the data needs to be qword-aligned, so pad with appropriate # of vifnops to
@@ -206,6 +290,9 @@ void CTexEnv::SendSettings(CVifSCDmaPacket& packet)
         packet.CloseDirect();
     }
     packet.CloseTag();
+    uint64_t texa;
+    memcpy(&texa, &gsrTexA, sizeof(texa));
+    NoteOrderedTextureSettings(packet, GetContext(), texa);
 }
 
 void CTexEnv::SetDimensions(uint32_t w, uint32_t h)

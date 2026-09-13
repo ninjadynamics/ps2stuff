@@ -14,6 +14,7 @@
 
 #include "ps2s/core.h"
 #include "ps2s/drawenv.h"
+#include "ps2s/texture.h"
 #include "ps2s/utils.h"
 
 namespace GS {
@@ -168,11 +169,13 @@ void CDrawEnv::CalculateClippedFBXYOffsets(bool addHalfPixel)
 
 void CDrawEnv::SendSettings(bool waitForEnd, bool flushCache)
 {
+    CTexEnv::InvalidateContext2Proof();
     GifPacket.Send(waitForEnd, flushCache);
 }
 
 void CDrawEnv::SendSettings(CSCDmaPacket& packet)
 {
+    CTexEnv::InvalidateContext2Proof();
     bool opened_tag;
     if ((opened_tag = !packet.HasOpenTag()))
         packet.Cnt();
@@ -204,6 +207,11 @@ void CDrawEnv::SendSettings(CVifSCDmaPacket& packet)
 
     if (opened_tag)
         packet.CloseTag();
+    // SendSettingsForBlend may temporarily override TEST. Record the bytes
+    // emitted here, before that caller restores its logical draw state.
+    CTexEnv::NoteOrderedDrawSettings(packet,
+        TestAddr == GS::RegAddrs::test_1 ? GS::kContext1 : GS::kContext2,
+        GetTestReg());
 }
 
 void CDrawEnv::SetFrameBufferDim(uint32_t pixelW, uint32_t pixelH)
