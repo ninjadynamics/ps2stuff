@@ -1,9 +1,9 @@
 /* Ordered scalar EE math shared by C and C++ callers.
  *
  * These helpers do not enable the legacy NO_ASM / NO_VU0_VECTORS alternatives.
- * Callers select them with independent experiment gates. All products retain
- * their operand order and all sums retain their left association. No ACC,
- * Q, I, SA, VU register, fixed FPR or memory access is hidden in the asm.
+ * All products retain their operand order and all sums retain their left
+ * association. No ACC, Q, I, SA, VU register, fixed FPR or memory access is
+ * hidden in the asm.
  *
  * Macros support raymath's external-inline C functions without referring to
  * static functions. OUT arguments must be float lvalues; inputs are evaluated

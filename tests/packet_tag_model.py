@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Source/byte-layout checks for PS2S_DIRECT_PACKET_TAGS; no EE compiler needed.
+"""Source/byte-layout checks for direct packet writes; no EE compiler needed.
 
-The new DMA-word expression is read from packet.h. The reference assigns each
+The DMA-word expression is read from packet.h. The reference assigns each
 manual-defined field independently, as the legacy bitfields do. Length patches
 are checked over their full valid ranges, with guard bytes and TTE payloads.
 This does not establish generated instruction selection or hardware performance.
@@ -56,12 +56,13 @@ def verify_dma_word(expression, values, previous, payload):
 
 
 def main():
-    assert re.search(r"#ifndef PS2S_DIRECT_PACKET_TAGS\s+#define PS2S_DIRECT_PACKET_TAGS 1", SOURCE)
+    assert "PS2S_DIRECT_PACKET_TAGS" not in SOURCE
     assert "reinterpret_cast<Packet::TagWord*>(tag) = word" in SOURCE
     assert "reinterpret_cast<Packet::TagHalfword*>(pOpenTag)" in SOURCE
     assert "reinterpret_cast<Packet::TagHalfword*>(pOpenVifCode) = (uint16_t)numQuads" in SOURCE
     assert "reinterpret_cast<unsigned char*>(pOpenVifCode)[2] = (unsigned char)unpackNUM" in SOURCE
-    assert "tag->QWC  = QWC;" in SOURCE and "pOpenVifCode->immediate = numQuads;" in SOURCE
+    assert "tag->QWC  = QWC;" not in SOURCE
+    assert "pOpenVifCode->immediate = numQuads;" not in SOURCE
 
     expression = source_word_expression()
     rng = random.Random(0x505332)

@@ -3,6 +3,9 @@ objs_*
 prebuilddone
 *.o
 *.a
+*.d
+*.pyc
+__pycache__/
 
 # CMake
 build/
@@ -10,5 +13,5 @@ CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 install_manifest.txt
-*.cmake
-!CMakeLists.txt
+CTestTestfile.cmake
+compile_commands.json

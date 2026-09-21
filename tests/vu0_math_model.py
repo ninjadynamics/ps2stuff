@@ -22,9 +22,11 @@ NAMES = ('PS2S_VU0_MAT4_MUL_ALIGNED', 'PS2S_VU0_MAT4_VEC4_ALIGNED',
          'PS2S_VU0_MAT4_VEC3_BATCH8_ALIGNED', 'PS2S_VU0_DOT3_POINTS4_ALIGNED')
 
 
-def instructions(name, variant=0):
-    blocks = list(re.finditer(r'#define ' + name + r'\([^\n]+\) \\\n(.*?while \(0\))', SOURCE, re.S))
-    block = blocks[variant][1]
+def instructions(name):
+    ee_source = SOURCE.split('#if defined(_EE)', 1)[1].split('#else', 1)[0]
+    blocks = list(re.finditer(r'#define ' + name + r'\([^\n]+\) \\\n(.*?while \(0\))', ee_source, re.S))
+    assert len(blocks) == 1
+    block = blocks[0][1]
     quoted = re.findall(r'"([^"\n]*)"', block)
     ops = [ast.literal_eval('"' + value + '"').strip() for value in quoted if r'\n\t' in value]
     assert ops
@@ -37,10 +39,8 @@ def instructions(name, variant=0):
 
 
 PROGRAMS = {name: instructions(name) for name in NAMES}
-PROGRAM_CASES = list(PROGRAMS.items()) + [(NAMES[4], instructions(NAMES[4], 1))]
-assert '#define PS2S_VU0_BATCH_INTERLEAVE 1' in SOURCE
-assert '#if PS2S_VU0_BATCH_INTERLEAVE != 0 && PS2S_VU0_BATCH_INTERLEAVE != 1' in SOURCE
-assert '#if PS2S_VU0_BATCH_INTERLEAVE' in SOURCE
+PROGRAM_CASES = list(PROGRAMS.items())
+assert 'PS2S_VU0_BATCH_INTERLEAVE' not in SOURCE
 
 
 def f32(value):
@@ -158,9 +158,8 @@ for name, ops in PROGRAM_CASES:
 # Check the real public-type -> aligned-array bridge and reconstruction.
 assert 'typedef float ps2s_vu0_mat4[16] __attribute__((aligned(16)));' in SOURCE
 assert 'typedef float ps2s_vu0_vec4[4] __attribute__((aligned(16)));' in SOURCE
-assert '#define PS2S_MATRIX_VU0 1' in CPU
-assert '#if (PS2S_MATRIX_VU0 != 0) && (PS2S_MATRIX_VU0 != 1)' in CPU
-assert CPU.count('#if PS2S_MATRIX_VU0 && defined(_EE)') == 2
+assert 'PS2S_MATRIX_VU0' not in CPU
+assert CPU.count('#if defined(_EE)') == 2
 assert 'cpu_vec_4 col0, col1, col2, col3;' in CPU
 for variable, prefix in (('matrix', ''), ('left', ''), ('right', 'rhs.')):
     initializer = re.search(r'const ps2s_vu0_mat4 ' + variable + r'\s*=\s*\{([^}]+)\}', CPU)[1]
@@ -209,15 +208,13 @@ def adjacent_dependencies(ops):
     return count
 
 
-interleaved, serial = PROGRAMS[NAMES[4]], PROGRAM_CASES[-1][1]
-assert len(interleaved) == len(serial) == 68
-assert interleaved[:12] == serial[:12]
-assert adjacent_dependencies(interleaved) == 0 and adjacent_dependencies(serial) == 24
+interleaved = PROGRAMS[NAMES[4]]
+assert len(interleaved) == 68
+assert adjacent_dependencies(interleaved) == 0
 assert max(map(int, re.findall(r'\$vf(\d+)', ' '.join(interleaved)))) == 24
-assert max(map(int, re.findall(r'\$vf(\d+)', ' '.join(serial)))) == 15
 
-print('PASS: 103 symbolic output lanes, both batch schedules and point-first dot3, no uninitialized output lane, all input loads before stores')
-print('PASS: actual typed staging/reconstruction, VU gate/default/precedence and 16-byte buffer types')
+print('PASS: 71 symbolic output lanes, interleaved batch and point-first dot3, no uninitialized output lane, all input loads before stores')
+print('PASS: actual typed staging/reconstruction, EE selection and 16-byte buffer types')
 print('PASS:', comparisons, 'float32 transfer/overlap/guard cases; native xyz output exactly 12 bytes')
-print('PASS: both batch schedules use 68 instructions; adjacent producer/consumer pairs 24 -> 0 (not a cycle prediction)')
+print('PASS: interleaved batch uses 68 instructions, no adjacent producer/consumer pairs (not a cycle prediction)')
 print('LIMIT: source model only; no compiler, VU arithmetic emulation, interrupt proof or hardware timing')

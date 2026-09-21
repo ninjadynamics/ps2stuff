@@ -88,32 +88,20 @@ assert [op for op, *_ in pair_ir] == ['mul.s'] * 8 + ['add.s'] * 6
 scalar = {}
 for lane, expression in re.findall(r'result\.([xyzw])\s*=\s*(.*?);', MATRIX):
     scalar[lane] = tree(expression)
-paired = {}
-for call in re.findall(r'PS2S_ORDERED_DOT4_PAIR_COP1\((.*?)\);', MATRIX, re.S):
-    values = [item.strip() for item in call.split(',')]
-    assert len(values) == len(pair_args)
-    bindings = dict(zip(pair_args, values))
-    for out in ('OUT0', 'OUT1'):
-        paired[bindings[out].split('.')[1]] = substitute(pair[out], bindings)
-
 for lane in LANES:
     bindings = {field: 'col' + str(i) + '.' + lane for i, field in enumerate(LANES)}
     bindings.update({'vec.' + field: 'rhs.' + field for field in LANES})
     expected = substitute(reference, bindings)
     assert scalar[lane] == expected
-    assert paired[lane] == expected
 
-# Removing either option reveals a real independent fallback; both old bodies
-# remain in the source, and private matrix storage is still four cpu_vec_4s.
+# The EE matrix bridge now uses the promoted VU0 kernels (covered separately
+# by vu0_math_model.py). These source-bound scalar expressions remain the
+# non-EE fallback; the ordered COP1 helpers retain their independent tests.
 for flag in ('PS2S_MATRIX_SCALAR_KERNEL', 'PS2S_MATRIX_EE_COP1'):
-    assert '#ifndef ' + flag + '\n#define ' + flag + ' 1' in MATRIX
-    assert '#if (' + flag + ' != 0) && (' + flag + ' != 1)' in MATRIX
-    assert '#error ' + flag + ' must be 0 or 1' in MATRIX
+    assert flag not in MATRIX
 assert 'cpu_vec_4 col0, col1, col2, col3;' in MATRIX
 for i in range(4):
     assert 'result.col%d = *this * rhs.col%d;' % (i, i) in MATRIX
-    assert 'result.col%d = *this * rhs.get_col%d();' % (i, i) in MATRIX
-assert 'result[3] = row3.dot(rhs);' in MATRIX
 assert '*reinterpret_cast' not in MATRIX and 'lqc2' not in MATH
 
 
@@ -176,16 +164,15 @@ for i in range(1600):
 
 for left, right in cases:
     expected = b''.join(map(bits, reference_product(left, right)))
-    for implementation in (scalar, paired):
-        actual = candidate_product(left, right, implementation)
-        assert b''.join(map(bits, actual)) == expected
-        # Assignment occurs after the complete returned object is evaluated.
-        alias_left, alias_right = list(left), list(right)
-        alias_left[:] = candidate_product(alias_left, alias_right, implementation)
-        assert b''.join(map(bits, alias_left)) == expected
-        alias_left, alias_right = list(left), list(right)
-        alias_right[:] = candidate_product(alias_left, alias_right, implementation)
-        assert b''.join(map(bits, alias_right)) == expected
+    actual = candidate_product(left, right, scalar)
+    assert b''.join(map(bits, actual)) == expected
+    # Assignment occurs after the complete returned object is evaluated.
+    alias_left, alias_right = list(left), list(right)
+    alias_left[:] = candidate_product(alias_left, alias_right, scalar)
+    assert b''.join(map(bits, alias_left)) == expected
+    alias_left, alias_right = list(left), list(right)
+    alias_right[:] = candidate_product(alias_left, alias_right, scalar)
+    assert b''.join(map(bits, alias_right)) == expected
 
 # Regression witnesses: the comparison must detect operation order and signed
 # zero, not merely approximate numerical equality.
@@ -195,6 +182,6 @@ reassociated = ('add.s', ('add.s', ('mul.s', a, b), ('mul.s', c, d)),
                 ('add.s', ('mul.s', 'A2', 'B2'), ('mul.s', 'A3', 'B3')))
 assert reassociated != dot_reference
 assert bits(0.0) != bits(-0.0)
-print('PASS: 3 asm operation trees, 4 scalar + 4 paired lane bindings, gate/storage checks')
-print('PASS:', len(cases), 'float32 matrix cases x 2 backends x 3 alias arrangements')
+print('PASS: 3 asm operation trees, 4 scalar fallback lane bindings, storage checks')
+print('PASS:', len(cases), 'float32 matrix cases x 3 alias arrangements')
 print('LIMIT: no compiler, EE execution, undocumented hardware rounding or performance claim')
