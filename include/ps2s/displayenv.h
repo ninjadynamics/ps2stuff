@@ -96,6 +96,7 @@ public:
         unsigned int psm = GS::kPsm32);
     inline void SetFB1Addr(unsigned int wordAddr) { gsrDispFB1.FBP = wordAddr / 2048; }
     inline void SetFB2Addr(unsigned int wordAddr) { gsrDispFB2.FBP = wordAddr / 2048; }
+    inline unsigned int GetFB2Addr() const { return gsrDispFB2.FBP * 2048; }
 
     inline void SetDisplay1(unsigned int width, unsigned int height,
         unsigned int screenX = 0, unsigned int screenY = 0,
@@ -130,6 +131,9 @@ public:
     // Avoids the full SendSettings' BGCOLOR write, which stomped the app's
     // margin color every frame (visible bands whenever frames ran long).
     void SendFBFlip(void);
+
+    // Copy both register values for immutable publication at a display boundary.
+    void GetFBFlip(uint64_t* fb1, uint64_t* fb2) const;
 
     // Push ONLY the active read circuit's DISPLAY2 register (raster position/
     // size). Leaves PMODE / DISPFB / BGCOLOR untouched, so a live re-center

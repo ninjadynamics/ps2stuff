@@ -12,6 +12,7 @@
 #include "ps2s/utils.h"
 
 #include <kernel.h>
+#include <string.h>
 
 namespace GS {
 
@@ -22,6 +23,11 @@ namespace GS {
 CDisplayEnv::CDisplayEnv(void)
 {
     *(uint64_t*)&gsrPMode = (uint64_t)0;
+    // Both circuits are snapshotted for an atomic frame publication, even
+    // when RC1 is disabled. Keep that descriptor and reserved bits defined.
+    memset(&gsrDispFB1, 0, sizeof(gsrDispFB1));
+    memset(&gsrDispFB2, 0, sizeof(gsrDispFB2));
+    memset(&gsrBGColor, 0, sizeof(gsrBGColor));
 
     gsrPMode.CRTMD = 0;
 
@@ -97,8 +103,16 @@ void CDisplayEnv::SendSettings(void)
 void CDisplayEnv::SendFBFlip(void)
 {
     using namespace GS::ControlRegs;
-    *(uint64_t*)dispfb1 = *(uint64_t*)&gsrDispFB1;
-    *(uint64_t*)dispfb2 = *(uint64_t*)&gsrDispFB2;
+    uint64_t fb1, fb2;
+    GetFBFlip(&fb1, &fb2);
+    *(volatile uint64_t*)dispfb1 = fb1;
+    *(volatile uint64_t*)dispfb2 = fb2;
+}
+
+void CDisplayEnv::GetFBFlip(uint64_t* fb1, uint64_t* fb2) const
+{
+    memcpy(fb1, &gsrDispFB1, sizeof(*fb1));
+    memcpy(fb2, &gsrDispFB2, sizeof(*fb2));
 }
 
 } // namespace GS
