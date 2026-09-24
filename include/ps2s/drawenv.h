@@ -229,11 +229,19 @@ public:
     // original depth test/write behavior (including the existing ZMSK).
     // This is an emitted TEST override: keep the application's logical alpha
     // test intact, and leave its explicitly enabled tests authoritative.
-    inline void SendSettingsForBlend(CVifSCDmaPacket& packet, bool blendEnabled)
+    inline void SendSettingsForBlend(CVifSCDmaPacket& packet, bool blendEnabled,
+        bool zeroAlphaDiscard = false)
     {
         const bool rgb16 = gsrFrame.psm == GS::kPsm16 ||
             gsrFrame.psm == GS::kPsm16s;
-        if (!blendEnabled || !rgb16 || !gsrDTHE.enable ||
+        const bool ditherProtection = rgb16 && gsrDTHE.enable;
+        // RGB24 has no stored alpha. RGB16 is eligible only where the
+        // existing dither protection already suppresses framebuffer writes.
+        // Other formats can change destination alpha even when RGB is an
+        // identity blend, so they retain their original behavior.
+        const bool discard = zeroAlphaDiscard && gsrZBuf.update_mask &&
+            (gsrFrame.psm == GS::kPsm24 || ditherProtection);
+        if (!blendEnabled || (!ditherProtection && !discard) ||
             gsrTest.atest_enable || gsrTest.datest_enable || gsrPABE.enable ||
             gsrAlpha.c != ABlend::kSourceAlpha || gsrAlpha.d != ABlend::kDestRGB) {
             SendSettings(packet);
@@ -243,7 +251,7 @@ public:
         EnableAlphaTest();
         SetAlphaRefVal(0);
         SetAlphaTestPassMode(ATest::kGreater);
-        SetAlphaTestFailAction(ATest::kZBuffOnly);
+        SetAlphaTestFailAction(discard ? ATest::kKeep : ATest::kZBuffOnly);
         // SendSettings copies the register block into packet-owned storage.
         // Restore only after that copy; queued packets retain their own TEST.
         SendSettings(packet);
