@@ -24,6 +24,7 @@
 CDmaPacket::CDmaPacket(uint128_t* buffer, uint32_t bufferQWSize, tDmaChannelId channel, uint32_t memMapping, bool isFull)
     : pBase((uint8_t*)buffer)
     , pNext((uint8_t*)((isFull) ? buffer + bufferQWSize : buffer))
+    , pSendStart((uint8_t*)buffer)
     , dmaChannelId(channel)
     , uiBufferQwordSize(bufferQWSize)
     , bDeallocateBuffer(false)
@@ -44,7 +45,7 @@ CDmaPacket::CDmaPacket(uint32_t bufferQWSize, tDmaChannelId channel, uint32_t me
     mErrorIf((memMapping == Core::MemMappings::Uncached || memMapping == Core::MemMappings::UncachedAccl) && bufferQWSize & (4 - 1),
         "Dma buffer size should be a whole number of cache lines (64 bytes = 4 quads) when using the uncached mem mappings!");
 
-    pBase = pNext = (uint8_t*)AllocBuffer(bufferQWSize, memMapping);
+    pBase = pNext = pSendStart = (uint8_t*)AllocBuffer(bufferQWSize, memMapping);
     mAssert(pBase != NULL);
 }
 
@@ -182,6 +183,32 @@ CVifSCDmaPacket::CVifSCDmaPacket(uint128_t* buffer, uint32_t bufferQWSize, tDmaC
     : CSCDmaPacket(buffer, bufferQWSize, channel, tte, memMapping, isFull)
     , pOpenVifCode(NULL)
 {
+}
+
+bool CVifSCDmaPacket::SendClosedPrefix(void)
+{
+    if (!CanSendClosedPrefix())
+        return false;
+    // QWC 0 END; with TTE its upper 64 bits carry two VIF NOPs.
+    End();
+    Pad128();
+    CloseTag();
+    FlushCache(0);
+    dma_channel_send_chain(dmaChannelId, (void*)((uint32_t)pSendStart & 0x0fffffff), 0,
+        bTTE ? DMA_FLAG_TRANSFERTAG : 0, 0);
+    pSendStart = pNext;
+    return true;
+}
+
+uint32_t CVifSCDmaPacket::TakeRemainder(void)
+{
+    mCheckPktLength();
+    mAssert(pOpenTag == NULL);
+    mAssert(pNext != pSendStart);
+    FlushCache(0);
+    const uint32_t start = (uint32_t)pSendStart & 0x0fffffff;
+    pSendStart = pNext;
+    return start;
 }
 
 CVifSCDmaPacket&

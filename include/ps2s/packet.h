@@ -88,7 +88,7 @@ public:
     void operator+=(const CDmaPacket& otherPkt);
     inline uint128_t* Add(const CDmaPacket& otherPkt);
 
-    inline void Reset(void) { pNext = pBase; }
+    inline void Reset(void) { pNext = pSendStart = pBase; }
     inline void SetDmaChannel(tDmaChannelId channel);
     virtual void Send(bool waitForEnd = false, bool flushCache = true);
 
@@ -130,6 +130,8 @@ public:
 
 protected:
     uint8_t *pBase, *pNext;
+    // HyperSolar streamed submission: first byte not yet handed to DMA.
+    uint8_t* pSendStart;
     tDmaChannelId dmaChannelId;
     uint32_t uiBufferQwordSize;
 
@@ -247,6 +249,24 @@ public:
 
     inline CVifSCDmaPacket& Pad96(void);
     inline CVifSCDmaPacket& Pad128(void);
+
+    // HyperSolar streamed submission. A source chain may be handed to DMA in
+    // ordered pieces. SendClosedPrefix() is legal only at a clean point (no
+    // open DMA tag or vifcode, qword aligned): it appends an END tag, writes
+    // the D-cache back, starts DMA at the first unsent tag and returns true.
+    // The caller proves the channel idle and owns every ordering condition.
+    // Later tags keep appending after the END. TakeRemainder() writes the
+    // D-cache back and returns the physical address of the first unsent tag
+    // for the caller to start (it may still be behind an in-flight prefix).
+    // Bytes already handed to DMA must never be written again.
+    bool CanSendClosedPrefix(void) const
+    {
+        return !HasOpenTag() && pOpenVifCode == NULL
+            && ((uint32_t)pNext & 0xf) == 0 && pNext != pSendStart;
+    }
+    uint32_t GetUnsentByteLength(void) const { return (uint32_t)(pNext - pSendStart); }
+    bool SendClosedPrefix(void);
+    uint32_t TakeRemainder(void);
 
 private:
     static const uint32_t Unused = 0;
