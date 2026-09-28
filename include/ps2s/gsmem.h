@@ -13,13 +13,6 @@
 
 #include <list>
 
-/* A/B: 1 keeps each slot's position in its owning list, so MRU/LRU moves and
-   removal are O(1) splices instead of a linear search per texture use. List
-   order and every membership change are unchanged. */
-#ifndef PS2S_SLOT_LIST_ITER
-#define PS2S_SLOT_LIST_ITER 1
-#endif
-
 #include "ps2s/gs.h"
 
 // There are 5 possible types of slot:
@@ -46,9 +39,7 @@ class CMemSlot {
     int LastFrameUsed;
     CMemSlotList* List;
     bool Locked;
-#if PS2S_SLOT_LIST_ITER
     std::list<CMemSlot*>::iterator ListPos; // valid while List contains this slot
-#endif
 
     // with all the pointers around, lets disallow copy constructing
     CMemSlot(const CMemSlot& rhs);
@@ -67,11 +58,9 @@ public:
     ~CMemSlot();
 
     void SetOwningList(CMemSlotList* slotList) { List = slotList; }
-#if PS2S_SLOT_LIST_ITER
     CMemSlotList* GetOwningList() const { return List; }
     void SetListPos(std::list<CMemSlot*>::iterator pos) { ListPos = pos; }
     std::list<CMemSlot*>::iterator GetListPos() const { return ListPos; }
-#endif
 
     int GetLastFrameUsed() const { return LastFrameUsed; }
     inline void RecordAccess(int curFrame);
@@ -118,9 +107,7 @@ public:
     void AddSlot(CMemSlot* newSlot)
     {
         Slots.push_back(newSlot);
-#if PS2S_SLOT_LIST_ITER
         newSlot->SetListPos(--Slots.end());
-#endif
         newSlot->SetOwningList(this);
     }
     void RemoveSlot(CMemSlot* slot);

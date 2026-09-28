@@ -131,28 +131,12 @@ void CMemSlotList::AccumMemInfo(int& total, int& used, int& largestFree)
     }
 }
 
-#if !PS2S_SLOT_LIST_ITER
-CMemSlotList::tSlotIter CMemSlotList::FindSlot(CMemSlot* slot)
-{
-    tSlotIter curSlot = Slots.begin();
-    for (; curSlot != Slots.end(); curSlot++)
-        if (*curSlot == slot) {
-            break;
-        }
-
-    mErrorIf(curSlot == Slots.end(), "This list does not contain the specified slot!");
-    return curSlot;
-}
-#endif
-
-#if PS2S_SLOT_LIST_ITER
 // The slot's stored position is authoritative while this list owns it.
 CMemSlotList::tSlotIter CMemSlotList::FindSlot(CMemSlot* slot)
 {
     mErrorIf(slot->GetOwningList() != this, "This list does not contain the specified slot!");
     return slot->GetOwningList() == this ? slot->GetListPos() : Slots.end();
 }
-#endif
 
 void CMemSlotList::RemoveSlot(CMemSlot* slot)
 {
