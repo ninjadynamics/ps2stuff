@@ -46,7 +46,11 @@ CDmaPacket::CDmaPacket(uint32_t bufferQWSize, tDmaChannelId channel, uint32_t me
         "Dma buffer size should be a whole number of cache lines (64 bytes = 4 quads) when using the uncached mem mappings!");
 
     pBase = pNext = pSendStart = (uint8_t*)AllocBuffer(bufferQWSize, memMapping);
-    mAssert(pBase != NULL);
+    if (pBase == NULL) {
+        fprintf(stderr, "ps2stuff: dma packet allocation failed (%u qwords)\n",
+            (unsigned int)bufferQWSize);
+        abort();
+    }
 }
 
 CDmaPacket::~CDmaPacket()
@@ -75,10 +79,13 @@ void* CDmaPacket::AllocBuffer(int numQwords, unsigned int memMapping)
     return mem;
 }
 
-void* CDmaPacket::SwapOutBuffer(void* newBuffer)
+void* CDmaPacket::SwapOutBuffer(void* newBuffer, uint32_t newQwordSize)
 {
-    void* oldBuffer = (void*)pBase;
-    pBase           = (uint8_t*)newBuffer;
+    void* oldBuffer   = (void*)pBase;
+    pBase             = (uint8_t*)newBuffer;
+    pNext             = pBase;
+    pSendStart        = pBase;
+    uiBufferQwordSize = newQwordSize;
     return oldBuffer;
 }
 

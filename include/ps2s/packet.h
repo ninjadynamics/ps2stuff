@@ -119,7 +119,8 @@ public:
     static void* AllocBuffer(int numQwords, unsigned int memMapping);
     // be VERY careful using this.. it swaps its internal dma buffer with the new,
     // returning the old..  be aware of where memory is being deallocated..
-    void* SwapOutBuffer(void* newBuffer);
+    // The packet adopts newQwordSize as its capacity and restarts empty.
+    void* SwapOutBuffer(void* newBuffer, uint32_t newQwordSize);
 
     // For an externally supplied AllocBuffer allocation, transfer its lifetime
     // to this packet only after construction succeeds.

@@ -62,9 +62,10 @@ inline void* New16(size_t size)
     return ::operator new(size, std::align_val_t(16));
 }
 
+// Must match New16's aligned allocation form.
 inline void Delete16(void* p)
 {
-    ::operator delete(p);
+    ::operator delete(p, std::align_val_t(16));
 }
 
 // cop0 counter

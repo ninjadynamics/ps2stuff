@@ -523,8 +523,9 @@ void CTexture::SetImage(uint128_t* imagePtr, uint32_t w, uint32_t h, GS::tPSM ps
     // clut
     pClut = (uint128_t*)clutPtr;
     if (clutPtr != NULL) {
-        mAssert(pClutUploadPkt == NULL);
-        pClutUploadPkt = new CClutUploadPkt;
+        // A redefinition reuses the packet, like pImageUploadPkt.
+        if (!pClutUploadPkt)
+            pClutUploadPkt = new CClutUploadPkt;
         pClutUploadPkt->SetClut(clutPtr);
     }
 }

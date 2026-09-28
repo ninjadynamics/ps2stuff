@@ -5,6 +5,7 @@
 	  main directory of this archive for more details.                             */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string>
 
 #include "ps2s/debug.h"
@@ -13,8 +14,10 @@
 
 /* HyperSolar: mErrorIf compiles out in release, so an unallocatable slot fell
    through to slot->Bind() on a NULL slot — a TLB crash (BadVAddr 0xC) with no
-   message. Fail LOUD and leave the area unbound instead: torn texels beat a
-   dead EE, and the printf names the missing/exhausted k_tex_shared slot class. */
+   message. Name the missing/exhausted k_tex_shared slot class and leave the
+   area unbound: callers must test IsAllocated() before using its address.
+   ps2gl's pinned-owner creators unwind on failure; every upload/Lock path
+   aborts (texture.cpp RequireGsSlot). */
 #define GSMEM_ALLOC_FAIL_GUARD(psmname, pagelen)                                        \
     if (maxPriority == -1) {                                                            \
         printf("gsmem: NO GS slot for psm%s pagelen %d — add/extend a k_tex_shared "    \
@@ -134,8 +137,11 @@ void CMemSlotList::AccumMemInfo(int& total, int& used, int& largestFree)
 // The slot's stored position is authoritative while this list owns it.
 CMemSlotList::tSlotIter CMemSlotList::FindSlot(CMemSlot* slot)
 {
-    mErrorIf(slot->GetOwningList() != this, "This list does not contain the specified slot!");
-    return slot->GetOwningList() == this ? slot->GetListPos() : Slots.end();
+    if (slot->GetOwningList() != this) {
+        fputs("gsmem: slot is not owned by this list\n", stderr);
+        abort();
+    }
+    return slot->GetListPos();
 }
 
 void CMemSlotList::RemoveSlot(CMemSlot* slot)
@@ -501,8 +507,10 @@ CMemArea::CMemArea(int width, int height,
 
 CMemArea::~CMemArea()
 {
-    // Ensure there are no outstanding references
-
+    // Ensure there are no outstanding references; a pinned slot returns to
+    // its free list before it is unbound.
+    if (Slot && Slot->IsLocked())
+        Slot->Unlock();
     Free();
 }
 
